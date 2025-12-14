@@ -173,3 +173,4 @@ class WarReminderService:
         await self.bot.send_message(chat_id, message, parse_mode="HTML")
         return None
 
+
