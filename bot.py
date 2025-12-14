@@ -4,8 +4,9 @@ from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from config import BOT_TOKEN
-from handlers import commands, war_commands
+from handlers import commands, war_commands, members, admin_panel, roles
 from utils.war_reminders import WarReminderService
+from database import db
 
 # Настройка логирования
 logging.basicConfig(
@@ -40,9 +41,17 @@ async def main():
     import handlers.war_commands as wc
     wc.war_reminder_service = war_reminder_service
     
+    # Инициализация первого админа (если база пуста)
+    admins = db.get_all_admins()
+    if not admins:
+        logger.warning("⚠️ В базе нет админов! Используйте /addadmin для добавления первого админа.")
+    
     # Регистрация роутеров
     dp.include_router(commands.router)
     dp.include_router(war_commands.router)
+    dp.include_router(members.router)
+    dp.include_router(admin_panel.router)
+    dp.include_router(roles.router)
     
     # Запуск бота
     logger.info("Бот запущен!")
