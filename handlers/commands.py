@@ -25,6 +25,7 @@ async def cmd_start(message: Message):
         "/remind [тег] - Подписаться на напоминания\n"
         "/unremind - Отписаться от напоминаний\n"
         "/remindnow [тег] - Напомнить сейчас\n"
+        "/config - Проверить конфигурацию\n"
         "/help - Справка"
     )
     await message.answer(welcome_text, parse_mode="HTML")
@@ -40,7 +41,8 @@ async def cmd_help(message: Message):
         "/clan - Получить информацию о клане\n"
         "/members - Получить список участников клана\n"
         "/player &lt;тег&gt; - Получить статистику игрока\n"
-        "   Пример: /player 2PP\n\n"
+        "   Пример: /player 2PP\n"
+        "/config - Проверить конфигурацию бота\n\n"
         "<b>Клановая война:</b>\n"
         "/war - Информация о текущей войне\n"
         "/warstats &lt;тег&gt; - Статистика игрока в войне\n"
@@ -50,6 +52,52 @@ async def cmd_help(message: Message):
         "<b>Примечание:</b> Тег игрока можно указать с # или без него."
     )
     await message.answer(help_text, parse_mode="HTML")
+
+
+@router.message(Command("config"))
+async def cmd_config(message: Message):
+    """Обработчик команды /config - проверка конфигурации"""
+    from config import CR_API_TOKEN, BOT_TOKEN
+    
+    config_text = "⚙️ <b>Конфигурация бота:</b>\n\n"
+    
+    # Проверка токена бота
+    if BOT_TOKEN:
+        bot_status = "✅ Установлен"
+        bot_preview = BOT_TOKEN[:10] + "..." if len(BOT_TOKEN) > 10 else "***"
+    else:
+        bot_status = "❌ Не установлен"
+        bot_preview = "не установлен"
+    
+    config_text += f"🤖 <b>BOT_TOKEN:</b> {bot_status}\n"
+    config_text += f"   <code>{bot_preview}</code>\n\n"
+    
+    # Проверка API токена
+    if CR_API_TOKEN:
+        api_status = "✅ Установлен"
+        api_preview = CR_API_TOKEN[:10] + "..." if len(CR_API_TOKEN) > 10 else "***"
+    else:
+        api_status = "❌ Не установлен"
+        api_preview = "не установлен"
+    
+    config_text += f"🔑 <b>CR_API_TOKEN:</b> {api_status}\n"
+    config_text += f"   <code>{api_preview}</code>\n\n"
+    
+    # Проверка тега клана
+    if CLAN_TAG:
+        clan_status = "✅ Установлен"
+        clan_preview = f"#{CLAN_TAG.upper()}"
+    else:
+        clan_status = "❌ Не установлен"
+        clan_preview = "не установлен"
+    
+    config_text += f"🏰 <b>CLAN_TAG:</b> {clan_status}\n"
+    config_text += f"   <code>{clan_preview}</code>\n\n"
+    
+    if not CR_API_TOKEN or not CLAN_TAG:
+        config_text += "⚠️ <b>Внимание:</b> Для работы бота необходимо установить все параметры в файле .env"
+    
+    await message.answer(config_text, parse_mode="HTML")
 
 
 @router.message(Command("clan"))
@@ -78,6 +126,8 @@ async def cmd_clan(message: Message):
 @router.message(Command("members"))
 async def cmd_members(message: Message):
     """Обработчик команды /members"""
+    from config import CR_API_TOKEN
+    
     if not CLAN_TAG:
         await message.answer(
             "❌ Тег клана не настроен. Обратитесь к администратору бота.",
@@ -85,17 +135,30 @@ async def cmd_members(message: Message):
         )
         return
     
+    if not CR_API_TOKEN:
+        await message.answer(
+            "❌ API токен не настроен. Обратитесь к администратору бота.",
+            parse_mode="HTML"
+        )
+        return
+    
     await message.answer("⏳ Загружаю список участников...")
     
     members = await cr_api.get_clan_members(CLAN_TAG)
-    if members:
+    if members is not None and len(members) > 0:
         text = format_clan_members(members)
         await message.answer(text, parse_mode="HTML")
     else:
-        await message.answer(
-            "❌ Не удалось получить список участников. Проверьте правильность тега клана и API токена.",
-            parse_mode="HTML"
-        )
+        error_msg = (
+            "❌ Не удалось получить список участников.\n\n"
+            "<b>Возможные причины:</b>\n"
+            "• Неверный тег клана (текущий: <code>#{}</code>)\n"
+            "• Неверный или отсутствующий API токен\n"
+            "• Превышен лимит запросов к API\n"
+            "• Проблемы с сетью\n\n"
+            "Проверьте логи бота для детальной информации."
+        ).format(CLAN_TAG.upper() if CLAN_TAG else "не установлен")
+        await message.answer(error_msg, parse_mode="HTML")
 
 
 @router.message(Command("player"))
